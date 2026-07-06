@@ -1,0 +1,123 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Profile{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Profile") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Edit Profile</h1>
+        <p>Update your personal information.</p>
+      </div>
+
+      <div style="max-width:560px">
+        <div class="card">
+          <div id="alert" class="alert alert-error hidden"></div>
+          <div id="success" class="alert alert-success hidden"></div>
+
+          <!-- Avatar -->
+          <div style="display:flex;align-items:center;gap:20px;margin-bottom:28px">
+            <div class="avatar" id="profile-avatar" style="width:72px;height:72px;font-size:1.4rem"></div>
+            <div>
+              <div style="font-weight:600;color:var(--text)" id="profile-name">Loading...</div>
+              <div style="font-size:0.85rem;color:var(--muted)" id="profile-email"></div>
+            </div>
+          </div>
+
+          <form id="profile-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">First Name</label>
+                <input type="text" name="fname" id="fname" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Last Name</label>
+                <input type="text" name="lname" id="lname" class="form-control" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email Address</label>
+              <input type="email" name="email" id="email" class="form-control">
+            </div>
+            <div class="form-group">
+              <label class="form-label">New Password <span class="text-muted" style="font-weight:400">(leave blank to keep current)</span></label>
+              <div class="input-group">
+                <input type="password" name="password" id="password" class="form-control" placeholder="Min. 8 characters">
+                <button type="button" class="input-group-btn" id="toggle-pw">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Profile Image URL</label>
+              <input type="url" name="profile_img" id="profile_img" class="form-control" placeholder="https://...">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Save Changes</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('toggle-pw').addEventListener('click', function() {
+  const pw = document.getElementById('password');
+  pw.type = pw.type === 'password' ? 'text' : 'password';
+});
+
+async function loadProfile() {
+  const user = await loadCurrentUser();
+  if (!user) return;
+  document.getElementById('fname').value = user.fname;
+  document.getElementById('lname').value = user.lname;
+  document.getElementById('email').value = user.email;
+  document.getElementById('profile_img').value = user.profile_img || '';
+  document.getElementById('profile-name').textContent = `${user.fname} ${user.lname}`;
+  document.getElementById('profile-email').textContent = user.email;
+  const av = document.getElementById('profile-avatar');
+  if (user.profile_img) {
+    av.innerHTML = `<img src="${user.profile_img}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    av.textContent = (user.fname?.[0] || '') + (user.lname?.[0] || '');
+  }
+}
+
+document.getElementById('profile-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const user = store.get('user');
+  if (!user) return;
+  const btn = document.getElementById('submit-btn');
+  const alertEl = document.getElementById('alert');
+  const successEl = document.getElementById('success');
+  setLoading(btn, true, 'Saving...');
+  hideAlert(alertEl); hideAlert(successEl);
+
+  const fd = new FormData(this);
+  const payload = {
+    fname: fd.get('fname'),
+    lname: fd.get('lname'),
+    email: fd.get('email'),
+    profile_img: fd.get('profile_img') || '',
+  };
+  const pw = fd.get('password');
+  if (pw) payload.password = pw;
+
+  try {
+    const data = await api.patch(`/api/user/update/${user.id}`, payload);
+    store.set('user', data.user);
+    showAlert(successEl, 'Profile updated successfully!', 'success');
+    populateSidebar(data.user);
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+
+loadProfile();
+</script>
+{% endblock %}

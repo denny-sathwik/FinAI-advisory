@@ -1,0 +1,209 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Transactions") }}
+    <div class="page-content">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h1>Transactions</h1>
+          <p>Your complete spending history.</p>
+        </div>
+        <a href="/spendings" class="btn btn-primary btn-sm">+ Add Transaction</a>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Merchant</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tx-table">
+              <tr><td colspan="7"><div class="skeleton" style="height:36px"></div></td></tr>
+              <tr><td colspan="7"><div class="skeleton" style="height:36px"></div></td></tr>
+              <tr><td colspan="7"><div class="skeleton" style="height:36px"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="pagination" class="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal-backdrop" id="edit-tx-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Edit Transaction</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div id="edit-alert" class="alert alert-error hidden"></div>
+    <form id="edit-tx-form">
+      <input type="hidden" id="edit-tx-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Merchant</label>
+          <input type="text" id="edit-merchant" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount (₹)</label>
+          <input type="number" id="edit-amount" class="form-control" required min="0" step="0.01">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" id="edit-date" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="edit-category" class="form-control" required>
+            <option value="groceries">Groceries</option>
+            <option value="housing">Housing</option>
+            <option value="transportation">Transportation</option>
+            <option value="food">Food & Dining</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="education">Education</option>
+            <option value="shopping">Shopping</option>
+            <option value="utilities">Utilities</option>
+            <option value="personal">Personal</option>
+            <option value="other-expense">Other Expense</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" id="edit-description" class="form-control">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button type="submit" class="btn btn-primary" id="edit-save-btn">Save Changes</button>
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const PAGE_SIZE = 10;
+let allTx = [];
+let currentPage = 1;
+
+function renderTable(page) {
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = allTx.slice(start, start + PAGE_SIZE);
+  const tbody = document.getElementById('tx-table');
+
+  if (allTx.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted" style="padding:32px">No transactions yet. <a href="/spendings">Add one →</a></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = slice.map((t, i) => `
+    <tr>
+      <td>${start + i + 1}</td>
+      <td>${formatDate(t.date)}</td>
+      <td><strong>${t.merchant_name}</strong></td>
+      <td><span class="badge badge-primary">${t.category}</span></td>
+      <td class="text-danger"><strong>${formatCurrency(t.amount)}</strong></td>
+      <td class="text-muted">${(t.description || '').substring(0, 40)}${t.description?.length > 40 ? '…' : ''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditTx(${t.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTx(${t.id}, this)">Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+function renderPagination(total, page) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+  let html = `<button class="page-btn" onclick="goPage(${page-1})" ${page===1?'disabled':''}>‹</button>`;
+  for (let p = 1; p <= pages; p++) {
+    html += `<button class="page-btn ${p===page?'active':''}" onclick="goPage(${p})">${p}</button>`;
+  }
+  html += `<button class="page-btn" onclick="goPage(${page+1})" ${page===pages?'disabled':''}>›</button>`;
+  document.getElementById('pagination').innerHTML = html;
+}
+
+function goPage(p) {
+  if (p < 1 || p > Math.ceil(allTx.length / PAGE_SIZE)) return;
+  currentPage = p;
+  renderTable(p);
+  renderPagination(allTx.length, p);
+}
+
+function openEditTx(id) {
+  const t = allTx.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('edit-tx-id').value = t.id;
+  document.getElementById('edit-merchant').value = t.merchant_name;
+  document.getElementById('edit-amount').value = t.amount;
+  document.getElementById('edit-date').value = t.date.split('T')[0];
+  document.getElementById('edit-category').value = t.category;
+  document.getElementById('edit-description').value = t.description || '';
+  openModal('edit-tx-modal');
+}
+
+document.getElementById('edit-tx-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('edit-save-btn');
+  const alertEl = document.getElementById('edit-alert');
+  setLoading(btn, true, 'Saving...');
+  hideAlert(alertEl);
+  const id = document.getElementById('edit-tx-id').value;
+  try {
+    await api.patch(`/api/transactions/${id}`, {
+      merchant_name: document.getElementById('edit-merchant').value,
+      amount: parseFloat(document.getElementById('edit-amount').value),
+      date: new Date(document.getElementById('edit-date').value).toISOString(),
+      category: document.getElementById('edit-category').value,
+      description: document.getElementById('edit-description').value,
+    });
+    closeModal('edit-tx-modal');
+    loadTransactions();
+  } catch(err) {
+    showAlert(alertEl, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+
+async function deleteTx(id, btn) {
+  if (!confirm('Delete this transaction?')) return;
+  btn.disabled = true;
+  try {
+    await api.delete(`/api/transactions/${id}`);
+    loadTransactions();
+  } catch(err) {
+    alert(err.message);
+    btn.disabled = false;
+  }
+}
+
+async function loadTransactions() {
+  try {
+    const data = await api.get('/api/transactions/');
+    allTx = data.transactions || [];
+    renderTable(1);
+    renderPagination(allTx.length, 1);
+  } catch {
+    document.getElementById('tx-table').innerHTML = `<tr><td colspan="7" class="text-center text-danger" style="padding:24px">Failed to load transactions.</td></tr>`;
+  }
+}
+
+loadTransactions();
+</script>
+{% endblock %}

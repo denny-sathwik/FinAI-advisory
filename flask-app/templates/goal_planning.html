@@ -1,0 +1,99 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Goal Planning{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Goal-Based Planning") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Goal-Based Planning</h1>
+        <p>Set a financial goal and get an AI-powered plan to achieve it.</p>
+      </div>
+
+      <div style="max-width:680px">
+        <div class="card">
+          <div id="alert" class="alert alert-error hidden"></div>
+          <form id="goal-form">
+            <div class="form-group">
+              <label class="form-label">Goal Title</label>
+              <input type="text" name="title" class="form-control" placeholder="e.g. Buy a house, Retire at 50" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Target Amount (₹)</label>
+                <input type="number" name="target_amount" class="form-control" placeholder="5000000" required min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Current Savings (₹)</label>
+                <input type="number" name="savings" class="form-control" placeholder="100000" required min="0">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Monthly Investment (₹)</label>
+                <input type="number" name="monthly_investment" class="form-control" placeholder="10000" required min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Time Horizon (years)</label>
+                <input type="number" name="time_horizon" class="form-control" placeholder="10" required min="1" max="40">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Risk Preference</label>
+              <select name="risk_preference" class="form-control" required>
+                <option value="">Select preference</option>
+                <option value="low">Low — Capital preservation</option>
+                <option value="medium">Medium — Balanced growth</option>
+                <option value="high">High — Maximum growth</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+              Generate My Investment Plan →
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="result-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Your Investment Plan</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div id="modal-content" style="color:var(--text);line-height:1.7"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('goal-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const alert = document.getElementById('alert');
+  setLoading(btn, true, 'Generating plan...');
+  hideAlert(alert);
+  const fd = new FormData(this);
+  try {
+    const data = await api.post('/api/ai/goal-planning', {
+      title: fd.get('title'),
+      target_amount: parseFloat(fd.get('target_amount')),
+      savings: parseFloat(fd.get('savings')),
+      monthly_investment: parseFloat(fd.get('monthly_investment')),
+      time_horizon: parseInt(fd.get('time_horizon')),
+      risk_preference: fd.get('risk_preference'),
+    });
+    document.getElementById('modal-content').innerHTML = renderMarkdown(data.ai_response);
+    openModal('result-modal');
+  } catch (err) {
+    showAlert(alert, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+</script>
+{% endblock %}

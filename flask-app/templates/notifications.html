@@ -1,0 +1,62 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Notifications") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Notifications</h1>
+        <p>Your recent account activity and alerts.</p>
+      </div>
+
+      <div style="max-width:680px">
+        <div id="notif-list">
+          <div class="skeleton mb-2" style="height:72px;border-radius:12px"></div>
+          <div class="skeleton mb-2" style="height:72px;border-radius:12px"></div>
+          <div class="skeleton mb-2" style="height:72px;border-radius:12px"></div>
+        </div>
+        <div id="empty-notif" class="empty-state hidden">
+          <p>No notifications yet. Activity will appear here after you log in, update your profile, etc.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const typeColors = { login: 'primary', update: 'warning', success: 'success', info: 'muted' };
+
+async function loadNotifications() {
+  try {
+    const data = await api.get('/api/user/notifications');
+    const notifs = data.notifications || [];
+    if (notifs.length === 0) {
+      document.getElementById('notif-list').innerHTML = '';
+      document.getElementById('empty-notif').classList.remove('hidden');
+      return;
+    }
+    document.getElementById('notif-list').innerHTML = notifs.map(n => `
+      <div class="card mb-2" style="padding:16px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+              <span class="badge badge-${typeColors[n.type] || 'muted'}">${n.type}</span>
+              <strong style="color:var(--text);font-size:0.9rem">${n.title}</strong>
+            </div>
+            <p style="font-size:0.85rem;margin:0">${n.message}</p>
+          </div>
+          <div style="font-size:0.75rem;color:var(--muted);white-space:nowrap">${formatDate(n.created_at)}</div>
+        </div>
+      </div>`).join('');
+  } catch {
+    document.getElementById('notif-list').innerHTML = `<p class="text-danger">Failed to load notifications.</p>`;
+  }
+}
+
+loadNotifications();
+</script>
+{% endblock %}

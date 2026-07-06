@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Contact Us{% endblock %}
+{% block body %}
+<nav class="public-nav">
+  <div class="brand brand-logo brand-logo-public">
+    <span class="brand-copy">
+      <span class="brand-name">FinAI Advisor</span>
+      <span class="brand-subtitle">AI financial planning</span>
+    </span>
+  </div>
+  <div style="display:flex;gap:12px">
+    <a href="/login" class="btn btn-secondary btn-sm">Log In</a>
+    <a href="/register" class="btn btn-primary btn-sm">Get Started</a>
+  </div>
+</nav>
+
+<div style="max-width:560px;margin:60px auto;padding:0 24px">
+  <h1 style="margin-bottom:8px">Contact Us</h1>
+  <p style="margin-bottom:32px">Have a question or feedback? We'd love to hear from you.</p>
+
+  <div class="card">
+    <div id="alert" class="alert alert-error hidden"></div>
+    <div id="success" class="alert alert-success hidden"></div>
+    <form id="contact-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" name="name" class="form-control" placeholder="Your name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" placeholder="you@example.com" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Subject</label>
+        <input type="text" name="subject" class="form-control" placeholder="How can we help?" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Message</label>
+        <textarea name="message" class="form-control" rows="5" placeholder="Your message..." required style="resize:vertical"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Send Message</button>
+    </form>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:0.8rem;margin-top:48px">
+  © 2025 FinAI Advisor
+</footer>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('contact-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const alertEl = document.getElementById('alert');
+  const successEl = document.getElementById('success');
+  setLoading(btn, true, 'Sending...');
+  hideAlert(alertEl); hideAlert(successEl);
+  const fd = new FormData(this);
+  try {
+    await api.post('/api/contact/', {
+      name: fd.get('name'), email: fd.get('email'),
+      subject: fd.get('subject'), message: fd.get('message'),
+    });
+    showAlert(successEl, 'Message sent! We\'ll get back to you soon.', 'success');
+    this.reset();
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+</script>
+{% endblock %}

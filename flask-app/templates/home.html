@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block body %}
+
+<!-- Nav -->
+<nav class="public-nav">
+  <div class="brand brand-logo brand-logo-public">
+    <span class="brand-copy">
+      <span class="brand-name">FinAI Advisor</span>
+      <span class="brand-subtitle">AI financial planning</span>
+    </span>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <a href="/login" class="btn btn-secondary btn-sm">Log In</a>
+    <a href="/register" class="btn btn-primary btn-sm">Get Started</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <h1>Your <span>AI-Powered</span><br>Financial Advisor</h1>
+  <p>Get personalized investment advice, risk assessments, and financial planning powered by Google Gemini AI and real-time market data.</p>
+  <div class="hero-btns">
+    <a href="/register" class="btn btn-primary btn-lg">Start Free →</a>
+    <a href="/login" class="btn btn-secondary btn-lg">Sign In</a>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features-section">
+  <h2>Everything you need to invest smarter</h2>
+  <div class="grid-3" style="gap:20px">
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3>AI Chat Advisor</h3>
+      <p>Ask anything about finance. Get instant, personalized advice powered by Gemini.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Portfolio Tracker</h3>
+      <p>Track your investments, spending, and net worth in real time with beautiful charts.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚠️</div>
+      <h3>Risk Assessment</h3>
+      <p>Understand your risk tolerance and get a customized investment strategy.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <h3>Goal Planning</h3>
+      <p>Set financial goals and get a step-by-step AI-driven plan to achieve them.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">❤️</div>
+      <h3>Financial Health Score</h3>
+      <p>Get a 0–100 score of your financial health with actionable improvements.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📰</div>
+      <h3>Stock News & Insights</h3>
+      <p>Search any stock, get live news, and AI-powered investment recommendations.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="text-align:center;padding:60px 24px;background:var(--surface);border-top:1px solid var(--border)">
+  <h2>Ready to take control of your finances?</h2>
+  <p style="margin:12px auto 28px;max-width:460px">Join thousands of users making smarter investment decisions with AI.</p>
+  <a href="/register" class="btn btn-primary btn-lg">Create Free Account</a>
+</section>
+
+<footer style="text-align:center;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:0.8rem">
+  © 2025 FinAI Advisor &mdash; Built with Python Flask + Google Gemini
+</footer>
+
+{% endblock %}

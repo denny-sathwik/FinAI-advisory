@@ -1,0 +1,153 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}News & Stocks{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("News & Stocks") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Stock News & AI Insights</h1>
+        <p>Search a ticker symbol to get live news and AI investment recommendations.</p>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="card mb-3">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="ticker-input" class="form-control" style="max-width:220px" placeholder="e.g. TSLA, AAPL, GOOGL">
+          <button class="btn btn-primary" id="search-btn" onclick="searchStock()">Search</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('RELIANCE.NS')">Reliance</button>
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('TCS.NS')">TCS</button>
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('INFY.NS')">Infosys</button>
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('HDFCBANK.NS')">HDFC Bank</button>
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('TATAMOTORS.NS')">Tata Motors</button>
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('ITC.NS')">ITC</button>
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('TSLA')">TSLA</button>
+            <button class="suggestion-chip" style="padding:6px 14px" onclick="quickSearch('AAPL')">AAPL</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Stock Recommendation -->
+      <div id="stock-insight" class="hidden mb-3">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="insight-ticker">Stock Analysis</div>
+              <div class="card-subtitle" id="insight-meta"></div>
+            </div>
+            <span id="insight-price" style="font-size:1.4rem;font-weight:700;color:var(--text)"></span>
+          </div>
+          <div id="insight-content" style="color:var(--text);line-height:1.7"></div>
+        </div>
+      </div>
+
+      <!-- News Grid -->
+      <div id="news-loading" class="hidden text-center" style="padding:40px">
+        <div class="spinner" style="width:32px;height:32px;margin:0 auto 12px"></div>
+        <p>Loading news...</p>
+      </div>
+      <div id="news-grid" class="news-grid"></div>
+      <div id="empty-news" class="empty-state hidden">
+        <p>Search for a stock ticker above to see news.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- News Summary Modal -->
+<div class="modal-backdrop" id="summary-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">AI News Summary</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div id="summary-content" style="color:var(--text);line-height:1.7"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function quickSearch(ticker) {
+  document.getElementById('ticker-input').value = ticker;
+  searchStock();
+}
+
+async function searchStock() {
+  const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!ticker) return;
+
+  const btn = document.getElementById('search-btn');
+  setLoading(btn, true, 'Searching...');
+  document.getElementById('news-loading').classList.remove('hidden');
+  document.getElementById('news-grid').innerHTML = '';
+  document.getElementById('stock-insight').classList.add('hidden');
+  document.getElementById('empty-news').classList.add('hidden');
+
+  try {
+    // Fetch news + AI recommendation in parallel
+    const [newsData, insightData] = await Promise.all([
+      api.get(`/api/ai/stock-news?ticker=${ticker}`).catch(() => ({ news: [] })),
+      api.post('/api/ai/stock-suggestion', { stock: ticker }).catch(() => null),
+    ]);
+
+    // AI Insight
+    if (insightData) {
+      document.getElementById('insight-ticker').textContent = `${ticker} — Investment Analysis`;
+      document.getElementById('insight-meta').textContent = `Sector: ${insightData.sector || 'N/A'} | P/E: ${insightData.pe_ratio || 'N/A'} | 1-Month Change: ${insightData.price_change_1mo !== null ? insightData.price_change_1mo + '%' : 'N/A'}`;
+      // Show ₹ for Indian stocks (.NS/.BO suffix), $ for US stocks
+      const currency = (ticker.endsWith('.NS') || ticker.endsWith('.BO')) ? '₹' : '$';
+      document.getElementById('insight-price').textContent = insightData.current_price ? `${currency}${insightData.current_price}` : '';
+      document.getElementById('insight-content').innerHTML = renderMarkdown(insightData.ai_response);
+      document.getElementById('stock-insight').classList.remove('hidden');
+    }
+
+    // News cards
+    const news = newsData.news || [];
+    if (news.length === 0) {
+      document.getElementById('empty-news').classList.remove('hidden');
+    } else {
+      document.getElementById('news-grid').innerHTML = news.map(item => `
+        <div class="news-card">
+          ${item.thumbnail ? `<img src="${item.thumbnail}" alt="" onerror="this.style.display='none'">` : ''}
+          <div class="news-card-body">
+            <div class="news-card-title">${(item.title || '').substring(0, 90)}${item.title?.length > 90 ? '…' : ''}</div>
+            <div class="news-card-meta">${item.publisher || ''} · ${item.published_at ? new Date(item.published_at * 1000).toLocaleDateString() : ''}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a href="${item.link}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Read →</a>
+              <button class="btn btn-outline btn-sm" onclick="summarizeNews('${encodeURIComponent(item.link)}')">🤖 AI Summary</button>
+            </div>
+          </div>
+        </div>`).join('');
+    }
+  } catch (err) {
+    document.getElementById('empty-news').classList.remove('hidden');
+    document.getElementById('empty-news').querySelector('p').textContent = 'Error: ' + err.message;
+  } finally {
+    document.getElementById('news-loading').classList.add('hidden');
+    setLoading(btn, false);
+  }
+}
+
+async function summarizeNews(encodedUrl) {
+  const url = decodeURIComponent(encodedUrl);
+  document.getElementById('summary-content').innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+  openModal('summary-modal');
+  try {
+    const data = await api.post('/api/ai/news-summary', { url });
+    document.getElementById('summary-content').innerHTML = renderMarkdown(data.ai_response);
+  } catch (err) {
+    document.getElementById('summary-content').innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
+  }
+}
+
+document.getElementById('ticker-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') searchStock();
+});
+
+// Load RELIANCE by default
+document.addEventListener('DOMContentLoaded', () => quickSearch('RELIANCE.NS'));
+</script>
+{% endblock %}

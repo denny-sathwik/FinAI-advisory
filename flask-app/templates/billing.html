@@ -1,0 +1,127 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Billing & Cards{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Billing & Cards") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Billing & Cards</h1>
+        <p>Manage your account financial details and payment cards.</p>
+      </div>
+
+      <div style="max-width:700px">
+        <div class="card">
+          <div id="alert" class="alert alert-error hidden"></div>
+          <div id="success" class="alert alert-success hidden"></div>
+          <form id="billing-form">
+            <div class="card-title mb-3">Account Details</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Total Balance (₹)</label>
+                <input type="number" name="total_balance" id="total_balance" class="form-control" placeholder="0" required min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Amount Invested (₹)</label>
+                <input type="number" name="amount_invested" id="amount_invested" class="form-control" placeholder="0" min="0">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Monthly Income (₹)</label>
+                <input type="number" name="monthly_income" id="monthly_income" class="form-control" placeholder="0" required min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Monthly Budget (₹)</label>
+                <input type="number" name="monthly_budget" id="monthly_budget" class="form-control" placeholder="0" required min="0">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Account Type</label>
+              <select name="account_type" id="account_type" class="form-control" required>
+                <option value="personal">Personal</option>
+                <option value="business">Business</option>
+                <option value="savings">Savings</option>
+              </select>
+            </div>
+
+            <div class="card-title mb-3 mt-3" style="border-top:1px solid var(--border);padding-top:20px">Card Details</div>
+            <div class="form-group">
+              <label class="form-label">Card Number (16 digits)</label>
+              <input type="text" name="card_number" id="card_number" class="form-control" placeholder="1234567812345678" maxlength="16" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Card Holder Name</label>
+                <input type="text" name="card_holder" id="card_holder" class="form-control" placeholder="John Doe" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">CVC (3 digits)</label>
+                <input type="text" name="card_cvc" id="card_cvc" class="form-control" placeholder="123" maxlength="3" required>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Save Account & Card</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadBillingData() {
+  // Load existing account
+  try {
+    const data = await api.get('/api/user/account');
+    const a = data.account;
+    document.getElementById('total_balance').value = a.total_balance || 0;
+    document.getElementById('amount_invested').value = a.amount_invested || 0;
+    document.getElementById('monthly_income').value = a.monthly_income || 0;
+    document.getElementById('monthly_budget').value = a.monthly_budget || 0;
+    document.getElementById('account_type').value = a.account_type || 'personal';
+  } catch {}
+
+  // Load existing card
+  try {
+    const data = await api.get('/api/user/card');
+    const c = data.cards[0];
+    document.getElementById('card_number').value = c.card_number || '';
+    document.getElementById('card_holder').value = c.card_holder || '';
+    document.getElementById('card_cvc').value = c.card_cvc || '';
+  } catch {}
+}
+
+document.getElementById('billing-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const alertEl = document.getElementById('alert');
+  const successEl = document.getElementById('success');
+  setLoading(btn, true, 'Saving...');
+  hideAlert(alertEl); hideAlert(successEl);
+  const fd = new FormData(this);
+  try {
+    await api.post('/api/user/account-details', {
+      total_balance: parseFloat(fd.get('total_balance')),
+      amount_invested: parseFloat(fd.get('amount_invested') || 0),
+      monthly_income: parseFloat(fd.get('monthly_income')),
+      monthly_budget: parseFloat(fd.get('monthly_budget')),
+      account_type: fd.get('account_type'),
+      card_number: fd.get('card_number'),
+      card_holder: fd.get('card_holder'),
+      card_cvc: fd.get('card_cvc'),
+    });
+    showAlert(successEl, 'Account and card saved successfully!', 'success');
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+
+loadBillingData();
+</script>
+{% endblock %}

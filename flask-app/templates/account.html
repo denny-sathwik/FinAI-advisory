@@ -1,0 +1,86 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Account Settings{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Account Settings") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Account Settings</h1>
+        <p>Manage your account security and preferences.</p>
+      </div>
+
+      <div style="max-width:560px;display:flex;flex-direction:column;gap:20px">
+
+        <!-- Account Info -->
+        <div class="card">
+          <div class="card-title mb-3">Account Information</div>
+          <div style="display:flex;flex-direction:column;gap:14px" id="account-info">
+            <div class="skeleton" style="height:20px"></div>
+            <div class="skeleton" style="height:20px"></div>
+            <div class="skeleton" style="height:20px"></div>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card" style="border-color:rgba(255,71,87,0.3)">
+          <div class="card-title mb-2" style="color:var(--danger)">Danger Zone</div>
+          <p style="font-size:0.875rem;margin-bottom:16px">Permanently delete your account and all associated data. This action cannot be undone.</p>
+          <button class="btn btn-danger" id="delete-btn" onclick="confirmDelete()">Delete Account</button>
+          <div id="delete-confirm" class="hidden mt-2">
+            <div class="alert alert-error">Are you absolutely sure? Type <strong>DELETE</strong> to confirm:</div>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <input type="text" id="delete-input" class="form-control" placeholder="Type DELETE">
+              <button class="btn btn-danger" onclick="deleteAccount()">Confirm</button>
+              <button class="btn btn-secondary" onclick="document.getElementById('delete-confirm').classList.add('hidden')">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Logout -->
+        <button class="btn btn-secondary" data-action="logout">
+          Sign Out
+        </button>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadAccountInfo() {
+  const user = await loadCurrentUser();
+  if (!user) return;
+  document.getElementById('account-info').innerHTML = `
+    <div style="display:flex;justify-content:space-between"><span class="text-muted">Name</span><strong>${user.fname} ${user.lname}</strong></div>
+    <div style="display:flex;justify-content:space-between"><span class="text-muted">Email</span><span>${user.email}</span></div>
+    <div style="display:flex;justify-content:space-between"><span class="text-muted">Login Method</span><span class="badge badge-primary">${user.signup_method}</span></div>
+    <div style="display:flex;justify-content:space-between"><span class="text-muted">Member Since</span><span>${formatDate(user.created_at)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span class="text-muted">Last Updated</span><span>${formatDate(user.updated_at)}</span></div>
+  `;
+}
+
+function confirmDelete() {
+  document.getElementById('delete-confirm').classList.remove('hidden');
+}
+
+async function deleteAccount() {
+  if (document.getElementById('delete-input').value !== 'DELETE') {
+    alert('Please type DELETE to confirm.');
+    return;
+  }
+  try {
+    await api.delete('/api/auth/delete');
+    store.del('user');
+    window.location.href = '/';
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+loadAccountInfo();
+</script>
+{% endblock %}

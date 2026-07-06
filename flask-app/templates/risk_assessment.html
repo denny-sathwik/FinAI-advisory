@@ -1,0 +1,137 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Risk Assessment{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Risk Assessment") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Risk Profile Assessment</h1>
+        <p>Answer 9 questions and get a personalized investment risk strategy.</p>
+      </div>
+
+      <div style="max-width:680px">
+        <div class="card">
+          <div id="alert" class="alert alert-error hidden"></div>
+          <form id="risk-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Age Group</label>
+                <select name="age" class="form-control" required>
+                  <option value="">Select age group</option>
+                  <option>Under 25</option><option>25–35</option><option>36–50</option><option>51–65</option><option>Over 65</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Income Source</label>
+                <select name="income" class="form-control" required>
+                  <option value="">Select income source</option>
+                  <option>Fixed Salary</option><option>Business Owner</option><option>Freelancer</option><option>Farmer</option><option>Retired</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Monthly Savings %</label>
+                <select name="savings" class="form-control" required>
+                  <option value="">Select range</option>
+                  <option>Less than 10%</option><option>10–25%</option><option>26–50%</option><option>More than 50%</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Investment Experience</label>
+                <select name="experience" class="form-control" required>
+                  <option value="">Select level</option>
+                  <option>None</option><option>Basic</option><option>Moderate (3+ years)</option><option>Expert</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Time Horizon</label>
+                <select name="time_horizon" class="form-control" required>
+                  <option value="">Select duration</option>
+                  <option>Less than 1 year</option><option>1–3 years</option><option>3–5 years</option><option>5+ years</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">If Market Drops 20%, You Would…</label>
+                <select name="market_drop" class="form-control" required>
+                  <option value="">Select reaction</option>
+                  <option>Sell everything</option><option>Sell some</option><option>Hold position</option><option>Buy more</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Financial Goal</label>
+                <select name="financial_goal" class="form-control" required>
+                  <option value="">Select goal</option>
+                  <option>Wealth Growth</option><option>Stable Income</option><option>Retirement</option><option>Emergency Fund</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Max Loss Tolerance</label>
+                <select name="loss_tolerance" class="form-control" required>
+                  <option value="">Select tolerance</option>
+                  <option>Less than 5%</option><option>5–10%</option><option>10–20%</option><option>More than 20%</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Do You Use Credit or Loans?</label>
+              <select name="take_loan" class="form-control" required>
+                <option value="">Select frequency</option>
+                <option>Regularly</option><option>Sometimes</option><option>Rarely</option><option>Never</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+              Analyze My Risk Profile →
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal-backdrop" id="result-modal">
+  <div class="modal" style="max-width:660px">
+    <div class="modal-header">
+      <div class="modal-title">Your Risk Assessment Result</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div id="modal-content" style="color:var(--text);line-height:1.7"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('risk-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const alert = document.getElementById('alert');
+  setLoading(btn, true, 'Analyzing...');
+  hideAlert(alert);
+
+  const fd = new FormData(this);
+  try {
+    const data = await api.post('/api/ai/risk-assessment', {
+      age: fd.get('age'), income: fd.get('income'), savings: fd.get('savings'),
+      experience: fd.get('experience'), time_horizon: fd.get('time_horizon'),
+      market_drop: fd.get('market_drop'), financial_goal: fd.get('financial_goal'),
+      loss_tolerance: fd.get('loss_tolerance'), take_loan: fd.get('take_loan'),
+    });
+    document.getElementById('modal-content').innerHTML = renderMarkdown(data.ai_response);
+    openModal('result-modal');
+  } catch (err) {
+    showAlert(alert, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+</script>
+{% endblock %}

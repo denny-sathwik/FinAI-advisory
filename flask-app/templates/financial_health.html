@@ -1,0 +1,96 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Financial Health Score{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Financial Health Score") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Financial Health Score</h1>
+        <p>Get a personalized score (0–100) based on your financial data.</p>
+      </div>
+
+      <div style="max-width:680px">
+        <div class="card">
+          <div id="alert" class="alert alert-error hidden"></div>
+          <form id="health-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Monthly Income (₹)</label>
+                <input type="number" name="monthly_income" class="form-control" placeholder="50000" required min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Total Monthly Expenses (₹)</label>
+                <input type="number" name="total_expenses" class="form-control" placeholder="30000" required min="0">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Total Debt (₹)</label>
+                <input type="number" name="total_debt" class="form-control" placeholder="200000" required min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Total Investments (₹)</label>
+                <input type="number" name="total_investments" class="form-control" placeholder="150000" required min="0">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Total Savings (₹)</label>
+                <input type="number" name="total_savings" class="form-control" placeholder="80000" required min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Emergency Fund (₹)</label>
+                <input type="number" name="emergency_fund" class="form-control" placeholder="50000" required min="0">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+              Calculate My Health Score →
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="result-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Your Financial Health Report</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div id="modal-content" style="color:var(--text);line-height:1.7"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('health-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const alert = document.getElementById('alert');
+  setLoading(btn, true, 'Calculating...');
+  hideAlert(alert);
+  const fd = new FormData(this);
+  try {
+    const data = await api.post('/api/ai/financial-health-score', {
+      monthly_income: parseFloat(fd.get('monthly_income')),
+      total_expenses: parseFloat(fd.get('total_expenses')),
+      total_debt: parseFloat(fd.get('total_debt')),
+      total_investments: parseFloat(fd.get('total_investments')),
+      total_savings: parseFloat(fd.get('total_savings')),
+      emergency_fund: parseFloat(fd.get('emergency_fund')),
+    });
+    document.getElementById('modal-content').innerHTML = renderMarkdown(data.ai_response);
+    openModal('result-modal');
+  } catch (err) {
+    showAlert(alert, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+</script>
+{% endblock %}

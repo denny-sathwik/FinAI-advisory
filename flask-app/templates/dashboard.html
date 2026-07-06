@@ -1,0 +1,307 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Dashboard") }}
+    <div class="page-content">
+
+      <!-- Stats -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card skeleton" style="height:90px"></div>
+        <div class="stat-card skeleton" style="height:90px"></div>
+        <div class="stat-card skeleton" style="height:90px"></div>
+        <div class="stat-card skeleton" style="height:90px"></div>
+      </div>
+
+      <!-- Charts + Card row -->
+      <div class="grid-2 mb-3" style="align-items:stretch">
+        <!-- Spending by Category -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Spending by Category</div>
+              <div class="card-subtitle">Current totals</div>
+            </div>
+          </div>
+          <div class="chart-container" style="flex:1;display:flex;align-items:center;justify-content:center">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Virtual Card -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-header">
+            <div class="card-title">Your Card</div>
+            <a href="/billing" class="btn btn-secondary btn-sm">Manage</a>
+          </div>
+          <div id="card-display" style="flex:1;display:flex;align-items:center;justify-content:center">
+            <div class="skeleton" style="height:180px;border-radius:16px;width:100%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Recent Transactions</div>
+          <a href="/transactions" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Merchant</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recent-tx">
+              <tr><td colspan="5"><div class="skeleton" style="height:36px"></div></td></tr>
+              <tr><td colspan="5"><div class="skeleton" style="height:36px"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal-backdrop" id="edit-tx-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Edit Transaction</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div id="edit-alert" class="alert alert-error hidden"></div>
+    <form id="edit-tx-form">
+      <input type="hidden" id="edit-tx-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Merchant</label>
+          <input type="text" id="edit-merchant" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount (₹)</label>
+          <input type="number" id="edit-amount" class="form-control" required min="0" step="0.01">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" id="edit-date" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="edit-category" class="form-control" required>
+            <option value="groceries">Groceries</option>
+            <option value="housing">Housing</option>
+            <option value="transportation">Transportation</option>
+            <option value="food">Food & Dining</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="education">Education</option>
+            <option value="shopping">Shopping</option>
+            <option value="utilities">Utilities</option>
+            <option value="personal">Personal</option>
+            <option value="other-expense">Other Expense</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" id="edit-description" class="form-control">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button type="submit" class="btn btn-primary" id="edit-save-btn">Save Changes</button>
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Override sidebar populate to use custom IDs
+function populateSidebar(user) {
+  const nameEl = document.getElementById('sidebar-name');
+  const emailEl = document.getElementById('sidebar-email');
+  const avatarEl = document.getElementById('sidebar-avatar');
+  if (nameEl) nameEl.textContent = `${user.fname} ${user.lname}`;
+  if (emailEl) emailEl.textContent = user.email;
+  if (avatarEl) {
+    if (user.profile_img) {
+      avatarEl.innerHTML = `<img src="${user.profile_img}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      avatarEl.textContent = (user.fname?.[0] || '') + (user.lname?.[0] || '');
+    }
+  }
+}
+
+async function loadDashboard() {
+  // Fire all 5 requests in parallel
+  const [accData, totalData, cardData, txData, statsData] = await Promise.all([
+    api.get('/api/user/account').catch(e => { console.error('account:', e.message); return null; }),
+    api.get('/api/transactions/total').catch(e => { console.error('total:', e.message); return { total_amount: 0 }; }),
+    api.get('/api/user/card').catch(e => { console.error('card:', e.message); return null; }),
+    api.get('/api/transactions/').catch(e => { console.error('transactions:', e.message); return { transactions: [] }; }),
+    api.get('/api/transactions/statistics').catch(e => { console.error('stats:', e.message); return { spending_by_category: [] }; }),
+  ]);
+
+  // Stats
+  const account = accData?.account;
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total Balance</div>
+      <div class="stat-value">${formatCurrency(account?.total_balance)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Amount Invested</div>
+      <div class="stat-value">${formatCurrency(account?.amount_invested)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Monthly Income</div>
+      <div class="stat-value">${formatCurrency(account?.monthly_income)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Spendings</div>
+      <div class="stat-value text-danger">${formatCurrency(totalData.total_amount)}</div>
+    </div>
+  `;
+
+  // Card display
+  if (cardData?.cards?.[0]) {
+    const c = cardData.cards[0];
+    document.getElementById('card-display').innerHTML = `
+      <div class="credit-card">
+        <div class="card-chip"></div>
+        <div class="card-number">${maskCard(c.card_number)}</div>
+        <div class="card-footer-row">
+          <div><div class="card-label">Card Holder</div><div class="card-value">${c.card_holder}</div></div>
+          <div><div class="card-label">CVC</div><div class="card-value">***</div></div>
+        </div>
+      </div>`;
+  } else {
+    document.getElementById('card-display').innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+        <p>No card added yet.</p>
+        <a href="/billing" class="btn btn-outline btn-sm mt-2">Add Card</a>
+      </div>`;
+  }
+
+  // Transactions table
+  {
+    const txs = (txData.transactions || []).slice(0, 8);
+    if (txs.length === 0) {
+      document.getElementById('recent-tx').innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="padding:28px">No transactions yet. <a href="/spendings">Add one →</a></td></tr>`;
+    } else {
+      document.getElementById('recent-tx').innerHTML = txs.map(t => `
+        <tr>
+          <td>${formatDate(t.date)}</td>
+          <td><strong>${t.merchant_name}</strong></td>
+          <td><span class="badge badge-primary">${t.category}</span></td>
+          <td class="text-danger"><strong>${formatCurrency(t.amount)}</strong></td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-outline btn-sm" onclick="openEditTx(${t.id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteTx(${t.id}, this)">Delete</button>
+          </td>
+        </tr>`).join('');
+    }
+  }
+
+  // Category Chart
+  {
+    const cats = statsData?.spending_by_category || [];
+    if (cats.length > 0) {
+      const colors = ['#6c63ff','#00d4aa','#ff6b6b','#ffa726','#26c6da','#ab47bc','#66bb6a','#ef5350','#42a5f5','#ffca28','#8d6e63'];
+      const ctx = document.getElementById('categoryChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: cats.map(c => c.category),
+          datasets: [{ data: cats.map(c => c.total_amount), backgroundColor: colors, borderWidth: 0, hoverOffset: 8 }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 1,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#8892b0', padding: 14, font: { size: 12 } } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${formatCurrency(ctx.raw)}` } },
+          },
+          cutout: '65%',
+        },
+      });
+    } else {
+      document.getElementById('categoryChart').parentElement.innerHTML = `<div class="empty-state"><p>No spending data yet.</p></div>`;
+    }
+  }
+}
+
+let _allTxCache = [];
+
+async function openEditTx(id) {
+  if (!_allTxCache.length) _allTxCache = (await api.get('/api/transactions/').catch(() => ({transactions:[]}))).transactions;
+  const t = _allTxCache.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('edit-tx-id').value = t.id;
+  document.getElementById('edit-merchant').value = t.merchant_name;
+  document.getElementById('edit-amount').value = t.amount;
+  document.getElementById('edit-date').value = t.date.split('T')[0];
+  document.getElementById('edit-category').value = t.category;
+  document.getElementById('edit-description').value = t.description || '';
+  openModal('edit-tx-modal');
+}
+
+document.getElementById('edit-tx-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('edit-save-btn');
+  const alertEl = document.getElementById('edit-alert');
+  setLoading(btn, true, 'Saving...');
+  hideAlert(alertEl);
+  const id = document.getElementById('edit-tx-id').value;
+  try {
+    await api.patch(`/api/transactions/${id}`, {
+      merchant_name: document.getElementById('edit-merchant').value,
+      amount: parseFloat(document.getElementById('edit-amount').value),
+      date: new Date(document.getElementById('edit-date').value).toISOString(),
+      category: document.getElementById('edit-category').value,
+      description: document.getElementById('edit-description').value,
+    });
+    closeModal('edit-tx-modal');
+    _allTxCache = [];
+    loadDashboard();
+  } catch(err) {
+    showAlert(alertEl, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+
+async function deleteTx(id, btn) {
+  if (!confirm('Delete this transaction?')) return;
+  btn.disabled = true;
+  try {
+    await api.delete(`/api/transactions/${id}`);
+    _allTxCache = [];
+    loadDashboard();
+  } catch(err) {
+    alert(err.message);
+    btn.disabled = false;
+  }
+}
+
+loadDashboard();
+</script>
+{% endblock %}

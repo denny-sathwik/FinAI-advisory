@@ -1,0 +1,154 @@
+{% from "partials/sidebar.html" import sidebar, topbar %}
+{% extends "base.html" %}
+{% block title %}Add Spending{% endblock %}
+{% block body %}
+<div class="app-layout">
+  {{ sidebar() }}
+  <div class="main-content">
+    {{ topbar("Add Spending") }}
+    <div class="page-content">
+      <div class="page-header">
+        <h1>Add Spending</h1>
+        <p>Log a transaction manually or scan a receipt with AI.</p>
+      </div>
+
+      <div style="max-width:680px">
+        <!-- AI Receipt Scanner -->
+        <div class="card mb-3">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📷 AI Receipt Scanner</div>
+              <div class="card-subtitle">Upload a receipt image and let AI extract the details</div>
+            </div>
+          </div>
+          <div id="scan-alert" class="alert alert-error hidden"></div>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <input type="file" id="receipt-file" accept="image/*" style="display:none">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('receipt-file').click()">
+              Choose Receipt Image
+            </button>
+            <button type="button" class="btn btn-outline" id="scan-btn" onclick="scanReceipt()">
+              🤖 Scan with AI
+            </button>
+            <span id="file-name" style="font-size:0.8rem;color:var(--muted)">No file selected</span>
+          </div>
+        </div>
+
+        <!-- Manual Form -->
+        <div class="card">
+          <div class="card-title mb-2">Transaction Details</div>
+          <div id="form-alert" class="alert alert-error hidden"></div>
+          <div id="form-success" class="alert alert-success hidden"></div>
+          <form id="spending-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Merchant / Store Name</label>
+                <input type="text" name="merchant_name" id="merchant_name" class="form-control" placeholder="e.g. Walmart" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" name="amount" id="amount" class="form-control" placeholder="499" required min="0" step="0.01">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" id="date" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Category</label>
+                <select name="category" id="category" class="form-control" required>
+                  <option value="">Select category</option>
+                  <option value="groceries">🛒 Groceries</option>
+                  <option value="housing">🏠 Housing</option>
+                  <option value="transportation">🚗 Transportation</option>
+                  <option value="food">🍕 Food & Dining</option>
+                  <option value="entertainment">🎬 Entertainment</option>
+                  <option value="healthcare">🏥 Healthcare</option>
+                  <option value="education">📚 Education</option>
+                  <option value="shopping">🛍️ Shopping</option>
+                  <option value="utilities">💡 Utilities</option>
+                  <option value="personal">💅 Personal</option>
+                  <option value="other-expense">📦 Other Expense</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <input type="text" name="description" id="description" class="form-control" placeholder="Optional notes...">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Save Transaction</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// Set today's date as default
+document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+// Show file name
+document.getElementById('receipt-file').addEventListener('change', function() {
+  document.getElementById('file-name').textContent = this.files[0]?.name || 'No file selected';
+});
+
+async function scanReceipt() {
+  const file = document.getElementById('receipt-file').files[0];
+  if (!file) {
+    showAlert(document.getElementById('scan-alert'), 'Please select a receipt image first.', 'warning');
+    return;
+  }
+  const btn = document.getElementById('scan-btn');
+  setLoading(btn, true, 'Scanning...');
+  hideAlert(document.getElementById('scan-alert'));
+
+  try {
+    const fd = new FormData();
+    fd.append('receipt', file);
+    const data = await api.postForm('/api/ai/scan-receipt', fd);
+
+    if (data.merchant_name) document.getElementById('merchant_name').value = data.merchant_name;
+    if (data.amount) document.getElementById('amount').value = data.amount;
+    if (data.date) document.getElementById('date').value = data.date.split('T')[0];
+    if (data.category) document.getElementById('category').value = data.category;
+    if (data.description) document.getElementById('description').value = data.description;
+
+    showAlert(document.getElementById('scan-alert'), '✅ Receipt scanned! Review the details below.', 'success');
+  } catch (err) {
+    showAlert(document.getElementById('scan-alert'), err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+document.getElementById('spending-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const alert = document.getElementById('form-alert');
+  const success = document.getElementById('form-success');
+  setLoading(btn, true, 'Saving...');
+  hideAlert(alert); hideAlert(success);
+
+  const fd = new FormData(this);
+  try {
+    await api.post('/api/transactions/add', {
+      merchant_name: fd.get('merchant_name'),
+      amount: parseFloat(fd.get('amount')),
+      date: new Date(fd.get('date')).toISOString(),
+      category: fd.get('category'),
+      description: fd.get('description') || '',
+    });
+    showAlert(success, 'Transaction saved successfully!', 'success');
+    this.reset();
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  } catch (err) {
+    showAlert(alert, err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+});
+</script>
+{% endblock %}
