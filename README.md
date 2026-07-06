@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="/public/logo.png" alt="Company Logo" width="500"/>
-</p>
-
----
+FinAI Advisory
 
 # **AI-Powered Financial & Investment Advisory System**  
 
