@@ -2,6 +2,10 @@ FinAI Advisory
 
 # **AI-Powered Financial & Investment Advisory System**  
 
+![Home Page](flask-app/static/img/project2.jpg)
+
+
+
 🔗 Live Demo: [finai-advisory.onrender.com](https://finai-advisory.onrender.com/)
 
 The AI-Powered Financial & Investment Advisory System is an innovative platform that leverages artificial intelligence to provide personalized investment insights, risk assessments, and financial planning strategies. By analyzing real-time market data, economic trends, and user preferences, the system delivers data-driven recommendations to help users optimize their investment decisions. Whether for beginners or experienced investors, this AI-driven solution ensures informed and strategic financial planning.
