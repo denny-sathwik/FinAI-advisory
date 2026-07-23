@@ -260,6 +260,8 @@ a:hover { opacity: 0.85; }
 .btn-primary:hover { background: #5850e8; color: #fff; }
 .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--border); }
+.btn-google { background: #fff; color: #202124; border: 1px solid #dadce0; }
+.btn-google:hover { background: #f8fafd; color: #202124; border-color: #c6c9ce; }
 .btn-success { background: var(--success); color: #fff; }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover { background: #e03e4a; color: #fff; }

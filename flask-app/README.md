@@ -90,9 +90,27 @@ JWT_SECRET_KEY=your-jwt-secret-key
 
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-1.5-flash
+
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/google/callback
 ```
 
-### 6. Run the application
+### 6. Configure Google sign-in
+
+1. Open Google Cloud Console and create or select a project.
+2. Go to **APIs & Services** -> **OAuth consent screen** and configure the consent screen.
+3. Go to **APIs & Services** -> **Credentials** -> **Create credentials** -> **OAuth client ID**.
+4. Choose **Web application**.
+5. Add this authorized redirect URI for local development:
+
+```text
+http://localhost:5000/api/auth/google/callback
+```
+
+6. Copy the generated client ID and client secret into `.env`.
+
+### 7. Run the application
 
 ```bash
 python run.py

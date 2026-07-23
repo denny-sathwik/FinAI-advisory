@@ -1,6 +1,6 @@
 from flask import Flask, jsonify
 from config import Config
-from extensions import db, bcrypt, jwt
+from extensions import db, bcrypt, jwt, oauth
 from flask_cors import CORS
 
 
@@ -14,6 +14,16 @@ def create_app():
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
+    oauth.init_app(app)
+
+    if app.config["GOOGLE_CLIENT_ID"] and app.config["GOOGLE_CLIENT_SECRET"]:
+        oauth.register(
+            name="google",
+            client_id=app.config["GOOGLE_CLIENT_ID"],
+            client_secret=app.config["GOOGLE_CLIENT_SECRET"],
+            server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+            client_kwargs={"scope": "openid email profile"},
+        )
 
     # Return JSON (not HTML) for all JWT auth errors
     @jwt.unauthorized_loader
