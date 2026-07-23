@@ -11,7 +11,7 @@
 | **Framework** | Flask 3.0 + FastAPI-style REST API |
 | **Database** | MySQL (via SQLAlchemy ORM) |
 | **Auth** | JWT (Flask-JWT-Extended) + bcrypt |
-| **AI / LLM** | Google Gemini (`gemini-1.5-flash`) |
+| **AI / LLM** | Groq api (`llama-3.1-8b-instant`) |
 | **Financial Data** | yfinance (live stock data) |
 | **ML Libraries** | Scikit-learn, Pandas, NumPy |
 | **Charts** | Chart.js (Doughnut, Bar) |
