@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
 from models.models import User, Account, Conversation
-import google.generativeai as genai
 import yfinance as yf
 import base64
 import requests
@@ -10,13 +9,87 @@ import json
 import re
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
+GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
-def get_gemini_model():
-    api_key = current_app.config["GEMINI_API_KEY"]
-    model_name = current_app.config.get("GEMINI_MODEL", "gemini-2.0-flash-lite")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(model_name)
+def _get_groq_api_key():
+    api_key = current_app.config.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("GROQ_API_KEY is missing. Add it to your .env file or Render environment variables.")
+    return api_key
+
+
+def _extract_groq_response(resp):
+    try:
+        payload = resp.json()
+    except ValueError:
+        payload = {}
+
+    if not resp.ok:
+        detail = payload.get("error", {}).get("message") or resp.text or "Groq API request failed"
+        raise RuntimeError(f"Groq API error {resp.status_code}: {detail}")
+
+    try:
+        return payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise RuntimeError("Groq API returned an unexpected response.")
+
+
+def generate_ai_text(prompt, model_name=None, response_format=None, max_completion_tokens=2048):
+    model = model_name or current_app.config.get("GROQ_MODEL", "llama-3.1-8b-instant")
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.4,
+        "max_completion_tokens": max_completion_tokens,
+    }
+    if response_format:
+        body["response_format"] = response_format
+
+    resp = requests.post(
+        GROQ_CHAT_URL,
+        headers={
+            "Authorization": f"Bearer {_get_groq_api_key()}",
+            "Content-Type": "application/json",
+        },
+        json=body,
+        timeout=60,
+    )
+    return _extract_groq_response(resp)
+
+
+def generate_ai_from_image(prompt, image_data, mime_type):
+    model = current_app.config.get("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
+    image_b64 = base64.b64encode(image_data).decode("utf-8")
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime_type};base64,{image_b64}"},
+                    },
+                ],
+            }
+        ],
+        "temperature": 0.1,
+        "max_completion_tokens": 1024,
+        "response_format": {"type": "json_object"},
+    }
+
+    resp = requests.post(
+        GROQ_CHAT_URL,
+        headers={
+            "Authorization": f"Bearer {_get_groq_api_key()}",
+            "Content-Type": "application/json",
+        },
+        json=body,
+        timeout=90,
+    )
+    return _extract_groq_response(resp)
 
 
 def clean_json(text):
@@ -52,9 +125,7 @@ User financial profile:
 You ONLY answer questions about finance, investments, stocks, mutual funds, SIP, PPF, NPS, crypto, real estate, savings, retirement, and economics with a focus on Indian markets (NSE/BSE, SEBI regulations, Indian tax laws).
 All monetary amounts should be in Indian Rupees (₹). Address the user by their first name. Refuse politely if the topic is not finance-related.
 """
-        model = get_gemini_model()
-        response = model.generate_content(context + "\n\nUser: " + prompt)
-        ai_response = response.text
+        ai_response = generate_ai_text(context + "\n\nUser: " + prompt)
 
         conv = Conversation(user_id=user_id, prompt=prompt, response=ai_response)
         db.session.add(conv)
@@ -77,6 +148,15 @@ def get_history():
         .all()
     )
     return jsonify({"history": [c.to_dict() for c in history]}), 200
+
+
+@ai_bp.route("/assistant/history", methods=["DELETE"])
+@jwt_required()
+def clear_history():
+    user_id = int(get_jwt_identity())
+    Conversation.query.filter_by(user_id=user_id).delete()
+    db.session.commit()
+    return jsonify({"message": "History cleared"}), 200
 
 
 # ── Financial Health Score ─────────────────────────────────────────────────────
@@ -107,9 +187,7 @@ All monetary values are in Indian Rupees (₹).
 Format your response in clear sections with headers."""
 
     try:
-        model = get_gemini_model()
-        response = model.generate_content(prompt)
-        return jsonify({"ai_response": response.text}), 200
+        return jsonify({"ai_response": generate_ai_text(prompt)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -145,9 +223,7 @@ Provide:
 4. Suggested investment instruments"""
 
     try:
-        model = get_gemini_model()
-        response = model.generate_content(prompt)
-        return jsonify({"ai_response": response.text}), 200
+        return jsonify({"ai_response": generate_ai_text(prompt)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -182,9 +258,7 @@ Provide:
 All amounts are in Indian Rupees (₹)."""
 
     try:
-        model = get_gemini_model()
-        response = model.generate_content(prompt)
-        return jsonify({"ai_response": response.text}), 200
+        return jsonify({"ai_response": generate_ai_text(prompt)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -212,15 +286,11 @@ def scan_receipt():
 Return ONLY the JSON object, no extra text."""
 
     try:
-        model = get_gemini_model()
-        response = model.generate_content([
-            {"mime_type": mime_type, "data": base64.b64encode(image_data).decode()},
-            prompt,
-        ])
+        raw = generate_ai_from_image(prompt, image_data, mime_type)
         try:
-            result = json.loads(clean_json(response.text))
+            result = json.loads(clean_json(raw))
         except json.JSONDecodeError:
-            result = {"raw": response.text}
+            result = {"raw": raw}
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -272,8 +342,6 @@ Provide:
 6. Suitability for Indian investors (mention any relevant SEBI/tax considerations if applicable)"""
 
     try:
-        model = get_gemini_model()
-        response = model.generate_content(prompt)
         return jsonify({
             "ticker": ticker,
             "current_price": current_price,
@@ -281,7 +349,7 @@ Provide:
             "market_cap": market_cap,
             "sector": sector,
             "price_change_1mo": price_change_1mo,
-            "ai_response": response.text,
+            "ai_response": generate_ai_text(prompt),
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -306,9 +374,7 @@ Provide:
 3. Affected sectors or assets
 4. Investor takeaway"""
 
-    model = get_gemini_model()
-    response = model.generate_content(prompt)
-    return jsonify({"ai_response": response.text}), 200
+    return jsonify({"ai_response": generate_ai_text(prompt)}), 200
 
 
 # ── Stock News ─────────────────────────────────────────────────────────────────

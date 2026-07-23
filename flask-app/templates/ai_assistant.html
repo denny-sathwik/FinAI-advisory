@@ -28,6 +28,14 @@
 
     <!-- Chat container -->
     <div class="chat-container" id="chat-container" style="display:none">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 20px 0">
+        <button class="btn btn-secondary" style="font-size:0.8rem;padding:5px 14px" onclick="resetChat()">
+          ← Back to Menu
+        </button>
+        <button class="btn btn-danger" style="font-size:0.8rem;padding:5px 14px" onclick="clearHistory()">
+          🗑 Clear History
+        </button>
+      </div>
       <div class="chat-messages" id="chat-messages"></div>
     </div>
 
@@ -92,6 +100,24 @@ async function sendMessage() {
 function sendSuggestion(text) {
   document.getElementById('chat-input').value = text.replace(/^[^\s]+\s/, '');
   sendMessage();
+}
+
+function resetChat() {
+  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('chat-container').style.display = 'none';
+  document.getElementById('suggestions-area').style.display = 'block';
+  document.getElementById('chat-input').value = '';
+  document.getElementById('chat-input').style.height = 'auto';
+}
+
+async function clearHistory() {
+  if (!confirm('Delete all chat history? This cannot be undone.')) return;
+  try {
+    await api.delete('/api/ai/assistant/history');
+    resetChat();
+  } catch (err) {
+    alert('Failed to clear history: ' + err.message);
+  }
 }
 
 // Load history
